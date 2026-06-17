@@ -3,22 +3,31 @@ import Foundation
 import WatchConnectivity
 #endif
 
+/// The data exchanged between the phone and the watch.
+///
+/// `poems` is only sent by the phone (the source of truth for poem content).
+/// `attempts` flows in both directions and is merged by union on each device.
+struct SyncPayload: Codable {
+    var poems: [Poem]?
+    var attempts: [LineAttempt]?
+}
+
 /// Bridges the iOS and watchOS apps using `WatchConnectivity`.
 ///
-/// The phone is the source of truth: it owns editing and pushes the full set
-/// of poems to the watch. The watch is read-only and never sends poems back —
-/// it only asks the phone to (re)send the current set when it launches.
+/// Poem content is owned by the phone and pushed to the watch. Practice
+/// attempts are recorded on either device and merged together, so success
+/// rates reflect practice from both.
 final class WatchConnectivityManager: NSObject {
     static let shared = WatchConnectivityManager()
 
-    /// Called when a new set of poems arrives from the counterpart device.
-    var onReceivePoems: (([Poem]) -> Void)?
-    /// Called when the counterpart asks us to resend the current poems.
+    /// Called when a payload arrives from the counterpart device.
+    var onReceive: ((SyncPayload) -> Void)?
+    /// Called when the counterpart asks us to resend our current state.
     var onRequestSync: (() -> Void)?
     /// Called once the session has finished activating.
     var onActivated: (() -> Void)?
 
-    private let poemsKey = "poems"
+    private let payloadKey = "payload"
     private let requestKey = "request"
 
     private override init() { super.init() }
@@ -32,23 +41,21 @@ final class WatchConnectivityManager: NSObject {
         #endif
     }
 
-    /// Push the full set of poems to the counterpart device.
-    func sendPoems(_ poems: [Poem]) {
+    /// Send the current state to the counterpart device.
+    func send(_ payload: SyncPayload) {
         #if canImport(WatchConnectivity)
-        guard let data = try? JSONEncoder().encode(poems) else { return }
+        guard let data = try? JSONEncoder().encode(payload) else { return }
         let session = WCSession.default
         guard session.activationState == .activated else { return }
-        do {
-            // Application context always reflects the latest full state.
-            try session.updateApplicationContext([poemsKey: data])
-        } catch {
-            // Fall back to a queued transfer if the context update fails.
-            _ = session.transferUserInfo([poemsKey: data])
-        }
+
+        // Application context keeps the latest full state for a fresh launch.
+        try? session.updateApplicationContext([payloadKey: data])
+        // A queued transfer guarantees delivery even when not reachable.
+        _ = session.transferUserInfo([payloadKey: data])
         #endif
     }
 
-    /// Ask the counterpart device to resend its current poems.
+    /// Ask the counterpart device to resend its current state.
     func requestSync() {
         #if canImport(WatchConnectivity)
         let session = WCSession.default
@@ -57,10 +64,10 @@ final class WatchConnectivityManager: NSObject {
         #endif
     }
 
-    private func decodeAndDeliver(_ payload: [String: Any]) {
-        guard let data = payload[poemsKey] as? Data,
-              let poems = try? JSONDecoder().decode([Poem].self, from: data) else { return }
-        onReceivePoems?(poems)
+    private func decodeAndDeliver(_ message: [String: Any]) {
+        guard let data = message[payloadKey] as? Data,
+              let payload = try? JSONDecoder().decode(SyncPayload.self, from: data) else { return }
+        onReceive?(payload)
     }
 }
 

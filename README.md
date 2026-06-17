@@ -5,16 +5,21 @@ A small SwiftUI app for **iOS and watchOS** that helps you memorize poetry.
 - **Editor** — add a poem with a title and its lines.
 - **View mode** — read the whole poem, stanza breaks preserved.
 - **Practice mode** — walk through the poem one line at a time: recall the next
-  line, tap to reveal, then move on. Past lines stay visible, upcoming lines
-  stay blurred.
+  line, tap to reveal, then grade yourself with ✓ (remembered) or ✗ (forgot).
+  Past lines stay visible, upcoming lines stay blurred.
+- **Attempt tracking** — every grade is saved with its date. Each poem shows an
+  "Attempts" card with the overall success rate, totals, and a per-line
+  breakdown. Attempts persist across sessions.
 - **Watch sync** — poems entered on iPhone automatically sync to the paired
-  Apple Watch, which offers the same view and practice modes (read-only).
+  Apple Watch. Practice happens on either device, and attempts are merged
+  together so success rates reflect practice from both.
 
 ## Project layout
 
 ```
 Shared/                      Code shared by both apps
   Poem.swift                 The poem model
+  LineAttempt.swift          Practice attempt record + stats types
   PoemStore.swift            Persistence + sync coordination
   WatchConnectivityManager.swift   WatchConnectivity bridge
 
@@ -22,8 +27,9 @@ LineByLine/                  iOS app
   LineByLineApp.swift
   PoemListView.swift         List of poems + add button
   PoemEditorView.swift       Title + content editor
-  PoemDetailView.swift       View mode
-  PracticeView.swift         Line-by-line practice
+  PoemDetailView.swift       View mode + attempts card
+  PracticeView.swift         Line-by-line practice with grading
+  StatsView.swift            Attempts card + per-line breakdown
 
 LineByLine Watch App/        watchOS app
   LineByLineWatchApp.swift
@@ -32,10 +38,12 @@ LineByLine Watch App/        watchOS app
   WatchPracticeView.swift    Line-by-line practice
 ```
 
-The iPhone is the source of truth. It persists poems to disk (JSON in the app's
-Application Support directory) and pushes the full set to the watch via
-`WatchConnectivity`. The watch caches what it receives and asks the phone to
-resend on launch.
+The iPhone is the source of truth for poem *content*: it persists poems to disk
+(JSON in the app's Application Support directory) and pushes them to the watch
+via `WatchConnectivity`. Practice *attempts* are append-only records with unique
+ids, so the phone and watch merge their logs by union — practice on either
+device counts toward the same success rates. Each device echoes its merged state
+back once when it learns something new, so the two converge.
 
 ## Building
 

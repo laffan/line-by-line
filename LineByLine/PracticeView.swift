@@ -2,22 +2,26 @@ import SwiftUI
 
 /// Practice mode: walks through the poem one line at a time.
 ///
-/// Lines you've already passed stay visible. The current line is hidden until
-/// you try to recall it and tap to reveal. Upcoming lines stay blurred.
+/// For each line you try to recall it, tap to reveal, then grade yourself with
+/// ✓ (remembered) or ✗ (forgot). Each grade is recorded as an attempt so the
+/// poem's success rate builds up over time.
 struct PracticeView: View {
     let poem: Poem
+    @EnvironmentObject private var store: PoemStore
     @Environment(\.dismiss) private var dismiss
 
     @State private var index = 0
     @State private var isRevealed = false
+    @State private var finished = false
+    @State private var sessionRemembered = 0
+    @State private var sessionTotal = 0
 
     private var lines: [String] { poem.practiceLines }
     private var isLastLine: Bool { index >= lines.count - 1 }
 
     var body: some View {
         VStack(spacing: 0) {
-            ProgressView(value: Double(index + 1),
-                         total: Double(max(lines.count, 1)))
+            ProgressView(value: Double(index + 1), total: Double(max(lines.count, 1)))
                 .padding(.horizontal)
                 .padding(.top, 8)
 
@@ -41,7 +45,9 @@ struct PracticeView: View {
                 }
             }
 
+            Divider()
             controls
+                .padding()
         }
         .navigationTitle("Practice")
         .navigationBarTitleDisplayMode(.inline)
@@ -55,12 +61,10 @@ struct PracticeView: View {
     @ViewBuilder
     private func lineView(index i: Int, text: String) -> some View {
         if i < index {
-            // Already practiced — shown plainly.
             Text(text)
                 .font(.title3)
                 .foregroundStyle(.secondary)
         } else if i == index {
-            // Current line: reveal on tap.
             Text(text)
                 .font(.title2.weight(.semibold))
                 .padding()
@@ -75,11 +79,8 @@ struct PracticeView: View {
                     }
                 }
                 .contentShape(Rectangle())
-                .onTapGesture {
-                    withAnimation { isRevealed = true }
-                }
+                .onTapGesture { reveal() }
         } else {
-            // Upcoming — kept hidden.
             Text(text)
                 .font(.title3)
                 .blur(radius: 8)
@@ -87,39 +88,68 @@ struct PracticeView: View {
         }
     }
 
+    @ViewBuilder
     private var controls: some View {
-        HStack {
-            Button {
-                previous()
-            } label: {
-                Label("Previous", systemImage: "chevron.left")
-            }
-            .disabled(index == 0)
-
-            Spacer()
-
-            Button(action: advance) {
-                Text(primaryButtonTitle)
-                    .frame(minWidth: 120)
+        if finished {
+            completion
+        } else if !isRevealed {
+            Button(action: reveal) {
+                Text("Reveal")
+                    .frame(maxWidth: .infinity)
             }
             .buttonStyle(.borderedProminent)
             .controlSize(.large)
+        } else {
+            HStack(spacing: 16) {
+                gradeButton(remembered: false, title: "Forgot",
+                            systemImage: "xmark", tint: .red)
+                gradeButton(remembered: true, title: "Remembered",
+                            systemImage: "checkmark", tint: .green)
+            }
         }
-        .padding()
     }
 
-    private var primaryButtonTitle: String {
-        if !isRevealed { return "Reveal" }
-        return isLastLine ? "Start Over" : "Next Line"
+    private func gradeButton(remembered: Bool, title: String,
+                             systemImage: String, tint: Color) -> some View {
+        Button {
+            grade(remembered: remembered)
+        } label: {
+            Label(title, systemImage: systemImage)
+                .frame(maxWidth: .infinity)
+        }
+        .buttonStyle(.borderedProminent)
+        .controlSize(.large)
+        .tint(tint)
     }
 
-    private func advance() {
+    private var completion: some View {
+        VStack(spacing: 12) {
+            Text("Session complete")
+                .font(.headline)
+            Text("Remembered \(sessionRemembered) of \(sessionTotal)")
+                .foregroundStyle(.secondary)
+            HStack {
+                Button("Done") { dismiss() }
+                    .buttonStyle(.bordered)
+                Button("Practice Again") { restart() }
+                    .buttonStyle(.borderedProminent)
+            }
+            .controlSize(.large)
+        }
+    }
+
+    private func reveal() {
+        withAnimation { isRevealed = true }
+    }
+
+    private func grade(remembered: Bool) {
+        store.recordAttempt(poemID: poem.id, lineIndex: index, remembered: remembered)
+        sessionTotal += 1
+        if remembered { sessionRemembered += 1 }
+
         withAnimation {
-            if !isRevealed {
-                isRevealed = true
-            } else if isLastLine {
-                index = 0
-                isRevealed = false
+            if isLastLine {
+                finished = true
             } else {
                 index += 1
                 isRevealed = false
@@ -127,11 +157,13 @@ struct PracticeView: View {
         }
     }
 
-    private func previous() {
-        guard index > 0 else { return }
+    private func restart() {
         withAnimation {
-            index -= 1
-            isRevealed = true
+            index = 0
+            isRevealed = false
+            finished = false
+            sessionRemembered = 0
+            sessionTotal = 0
         }
     }
 }

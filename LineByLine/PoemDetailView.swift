@@ -25,11 +25,13 @@ struct PoemDetailView: View {
                         NavigationStack {
                             PoemEditorView(poem: poem, isNew: false)
                         }
+                        .environmentObject(store)
                     }
                     .fullScreenCover(isPresented: $isPracticing) {
                         NavigationStack {
                             PracticeView(poem: poem)
                         }
+                        .environmentObject(store)
                     }
             } else {
                 ContentUnavailableView("Poem Not Found",
@@ -51,6 +53,14 @@ struct PoemDetailView: View {
                                 .font(.title3)
                         }
                     }
+
+                    NavigationLink {
+                        StatsView(poem: poem)
+                    } label: {
+                        StatsCard(stats: store.stats(for: poem))
+                    }
+                    .buttonStyle(.plain)
+                    .padding(.top, 24)
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding()

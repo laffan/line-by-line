@@ -25,6 +25,19 @@ struct WatchPoemDetailView: View {
                     }
                     .disabled(poem.practiceLines.isEmpty)
                     .padding(.top, 8)
+
+                    let stats = store.stats(for: poem)
+                    if stats.hasData {
+                        HStack {
+                            Label("Success", systemImage: "chart.bar.fill")
+                                .font(.caption2)
+                                .foregroundStyle(.secondary)
+                            Spacer()
+                            Text(stats.successRate, format: .percent.precision(.fractionLength(0)))
+                                .font(.caption.weight(.semibold))
+                        }
+                        .padding(.top, 4)
+                    }
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
             }
