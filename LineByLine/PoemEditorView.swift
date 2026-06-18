@@ -6,6 +6,7 @@ struct PoemEditorView: View {
     @Environment(\.dismiss) private var dismiss
 
     @State private var title: String
+    @State private var author: String
     @State private var content: String
 
     private let poem: Poem
@@ -15,6 +16,7 @@ struct PoemEditorView: View {
         self.poem = poem
         self.isNew = isNew
         _title = State(initialValue: poem.title)
+        _author = State(initialValue: poem.author)
         _content = State(initialValue: poem.content)
     }
 
@@ -27,6 +29,10 @@ struct PoemEditorView: View {
         Form {
             Section("Title") {
                 TextField("Title", text: $title)
+                    .textInputAutocapitalization(.words)
+            }
+            Section("Author") {
+                TextField("Author", text: $author)
                     .textInputAutocapitalization(.words)
             }
             Section("Lines") {
@@ -51,6 +57,7 @@ struct PoemEditorView: View {
     private func save() {
         var edited = poem
         edited.title = title
+        edited.author = author
         edited.content = content
         if isNew {
             store.add(edited)

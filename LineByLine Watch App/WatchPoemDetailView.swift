@@ -9,6 +9,11 @@ struct WatchPoemDetailView: View {
         if let poem = store.poem(id: poemID) {
             ScrollView {
                 VStack(alignment: .leading, spacing: 6) {
+                    if !poem.displayAuthor.isEmpty {
+                        Text(poem.displayAuthor)
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                    }
                     ForEach(Array(poem.rawLines.enumerated()), id: \.offset) { _, line in
                         if line.trimmingCharacters(in: .whitespaces).isEmpty {
                             Color.clear.frame(height: 8)

@@ -44,6 +44,12 @@ struct PoemDetailView: View {
         VStack(spacing: 0) {
             ScrollView {
                 VStack(alignment: .leading, spacing: 8) {
+                    if !poem.displayAuthor.isEmpty {
+                        Text(poem.displayAuthor)
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                            .padding(.bottom, 8)
+                    }
                     ForEach(Array(poem.rawLines.enumerated()), id: \.offset) { _, line in
                         if line.trimmingCharacters(in: .whitespaces).isEmpty {
                             // Preserve stanza breaks with a little vertical space.

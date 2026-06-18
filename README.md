@@ -2,7 +2,7 @@
 
 A small SwiftUI app for **iOS and watchOS** that helps you memorize poetry.
 
-- **Editor** — add a poem with a title and its lines.
+- **Editor** — add a poem with a title, author, and its lines.
 - **View mode** — read the whole poem, stanza breaks preserved.
 - **Practice mode** — walk through the poem one line at a time: recall the next
   line, tap to reveal, then grade yourself with ✓ (remembered) or ✗ (forgot).
