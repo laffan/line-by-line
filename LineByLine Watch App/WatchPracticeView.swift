@@ -22,23 +22,24 @@ struct WatchPracticeView: View {
             completion
         } else {
             VStack(spacing: 6) {
-                ScrollView {
-                    Text(lines.isEmpty ? "" : lines[index])
-                        .font(.title3.weight(.semibold))
-                        .multilineTextAlignment(.center)
-                        .frame(maxWidth: .infinity)
-                        .blur(radius: isRevealed ? 0 : 7)
-                        .overlay {
-                            if !isRevealed {
-                                Text("Tap to reveal")
-                                    .font(.caption2)
-                                    .foregroundStyle(.tint)
+                GeometryReader { geo in
+                    ScrollView {
+                        Text(lines.isEmpty ? "" : lines[index])
+                            .font(.title3.weight(.semibold))
+                            .multilineTextAlignment(.center)
+                            .frame(maxWidth: .infinity, minHeight: geo.size.height)
+                            .blur(radius: isRevealed ? 0 : 7)
+                            .overlay {
+                                if !isRevealed {
+                                    Text("Tap to reveal")
+                                        .font(.caption2)
+                                        .foregroundStyle(.tint)
+                                }
                             }
-                        }
-                        .padding(.vertical, 4)
+                    }
+                    .contentShape(Rectangle())
+                    .onTapGesture { reveal() }
                 }
-                .contentShape(Rectangle())
-                .onTapGesture { reveal() }
 
                 if isRevealed {
                     HStack(spacing: 16) {
@@ -56,11 +57,12 @@ struct WatchPracticeView: View {
             grade(remembered: remembered)
         } label: {
             Image(systemName: systemImage)
-                .font(.headline)
+                .font(.system(size: 15, weight: .bold))
+                .frame(maxWidth: .infinity)
         }
         .buttonStyle(.borderedProminent)
-        .controlSize(.small)
         .tint(tint)
+        .frame(height: 22)
     }
 
     private var completion: some View {
