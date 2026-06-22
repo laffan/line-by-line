@@ -2,10 +2,11 @@ import SwiftUI
 
 /// Practice mode on the watch: one line at a time, tap to reveal, then grade
 /// yourself with ✓ / ✗. Grades are recorded and synced back to the phone.
+///
+/// Shown as the second page of ``WatchPoemDetailView`` (swipe right-to-left).
 struct WatchPracticeView: View {
     let poem: Poem
     @EnvironmentObject private var store: PoemStore
-    @Environment(\.dismiss) private var dismiss
 
     @State private var index = 0
     @State private var isRevealed = false
@@ -17,76 +18,64 @@ struct WatchPracticeView: View {
     private var isLastLine: Bool { index >= lines.count - 1 }
 
     var body: some View {
-        VStack(spacing: 8) {
-            if finished {
-                completion
-            } else {
-                ProgressView(value: Double(index + 1), total: Double(max(lines.count, 1)))
-                Text("\(index + 1) / \(lines.count)")
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
-
-                Spacer(minLength: 0)
-                currentLine
-                Spacer(minLength: 0)
-
-                controls
-            }
-        }
-        .padding(.horizontal, 4)
-        .navigationTitle("Practice")
-    }
-
-    private var currentLine: some View {
-        Text(lines.isEmpty ? "" : lines[index])
-            .font(.title3.weight(.semibold))
-            .multilineTextAlignment(.center)
-            .frame(maxWidth: .infinity)
-            .blur(radius: isRevealed ? 0 : 7)
-            .overlay {
-                if !isRevealed {
-                    Text("Tap to reveal")
-                        .font(.caption)
-                        .foregroundStyle(.tint)
-                }
-            }
-            .contentShape(Rectangle())
-            .onTapGesture { reveal() }
-    }
-
-    @ViewBuilder
-    private var controls: some View {
-        if !isRevealed {
-            Button(action: reveal) {
-                Text("Reveal").frame(maxWidth: .infinity)
-            }
-            .buttonStyle(.borderedProminent)
+        if finished {
+            completion
         } else {
-            HStack(spacing: 8) {
-                Button { grade(remembered: false) } label: {
-                    Image(systemName: "xmark").frame(maxWidth: .infinity)
+            VStack(spacing: 6) {
+                ScrollView {
+                    Text(lines.isEmpty ? "" : lines[index])
+                        .font(.title3.weight(.semibold))
+                        .multilineTextAlignment(.center)
+                        .frame(maxWidth: .infinity)
+                        .blur(radius: isRevealed ? 0 : 7)
+                        .overlay {
+                            if !isRevealed {
+                                Text("Tap to reveal")
+                                    .font(.caption2)
+                                    .foregroundStyle(.tint)
+                            }
+                        }
+                        .padding(.vertical, 4)
                 }
-                .tint(.red)
+                .contentShape(Rectangle())
+                .onTapGesture { reveal() }
 
-                Button { grade(remembered: true) } label: {
-                    Image(systemName: "checkmark").frame(maxWidth: .infinity)
+                if isRevealed {
+                    HStack(spacing: 16) {
+                        gradeButton(remembered: false, systemImage: "xmark", tint: .red)
+                        gradeButton(remembered: true, systemImage: "checkmark", tint: .green)
+                    }
+                    .padding(.bottom, 2)
                 }
-                .tint(.green)
             }
-            .buttonStyle(.borderedProminent)
         }
+    }
+
+    private func gradeButton(remembered: Bool, systemImage: String, tint: Color) -> some View {
+        Button {
+            grade(remembered: remembered)
+        } label: {
+            Image(systemName: systemImage)
+                .font(.headline)
+        }
+        .buttonStyle(.borderedProminent)
+        .controlSize(.small)
+        .tint(tint)
     }
 
     private var completion: some View {
-        VStack(spacing: 8) {
-            Text("Complete")
-                .font(.headline)
-            Text("\(sessionRemembered) / \(sessionTotal)")
-                .foregroundStyle(.secondary)
-            Button("Again") { restart() }
-                .buttonStyle(.borderedProminent)
-            Button("Done") { dismiss() }
-                .buttonStyle(.bordered)
+        ScrollView {
+            VStack(spacing: 8) {
+                Text("Complete")
+                    .font(.headline)
+                Text("\(sessionRemembered) / \(sessionTotal)")
+                    .foregroundStyle(.secondary)
+                Button("Again") { restart() }
+                    .buttonStyle(.borderedProminent)
+                    .controlSize(.small)
+            }
+            .frame(maxWidth: .infinity)
+            .padding(.top, 8)
         }
     }
 

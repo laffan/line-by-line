@@ -30,7 +30,7 @@ struct WatchPoemListView: View {
                     }
                 }
             }
-            .navigationTitle("Line by Line")
+            .navigationTitle("")
             .navigationDestination(for: UUID.self) { id in
                 WatchPoemDetailView(poemID: id)
             }
