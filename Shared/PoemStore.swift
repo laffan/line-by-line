@@ -11,9 +11,14 @@ import Combine
 final class PoemStore: ObservableObject {
     @Published private(set) var poems: [Poem] = []
     @Published private(set) var attempts: [UUID: LineAttempt] = [:]
+    /// Poem id → local audio-file URL for poems that have a recorded reading.
+    /// Readings live on disk (not in the poem JSON) and are not synced to the
+    /// watch, since audio files are large and playback is iOS-only.
+    @Published private(set) var readingURLs: [UUID: URL] = [:]
 
     private let poemsURL: URL
     private let attemptsURL: URL
+    private let readingsDirectory: URL
     private let connectivity = WatchConnectivityManager.shared
 
     init(directoryName: String = "LineByLineData") {
@@ -22,8 +27,11 @@ final class PoemStore: ObservableObject {
         try? FileManager.default.createDirectory(at: base, withIntermediateDirectories: true)
         poemsURL = base.appendingPathComponent("poems.json")
         attemptsURL = base.appendingPathComponent("attempts.json")
+        readingsDirectory = base.appendingPathComponent("Readings", isDirectory: true)
+        try? FileManager.default.createDirectory(at: readingsDirectory, withIntermediateDirectories: true)
 
         load()
+        loadReadings()
 
         connectivity.onReceive = { [weak self] payload in
             Task { @MainActor in self?.receive(payload) }
@@ -75,6 +83,41 @@ final class PoemStore: ObservableObject {
         }
     }
 
+    // MARK: - Readings (iOS)
+
+    /// The local audio file for a poem's reading, if one has been attached.
+    func reading(for poemID: UUID) -> URL? {
+        readingURLs[poemID]
+    }
+
+    /// Copy an imported audio file into the app's storage as `poemID`'s reading,
+    /// replacing any existing one. `source` is expected to be a security-scoped
+    /// URL from a file importer.
+    func attachReading(from source: URL, to poemID: UUID) throws {
+        let scoped = source.startAccessingSecurityScopedResource()
+        defer { if scoped { source.stopAccessingSecurityScopedResource() } }
+
+        removeReading(for: poemID)
+
+        let ext = source.pathExtension.isEmpty ? "m4a" : source.pathExtension
+        let destination = readingsDirectory
+            .appendingPathComponent(poemID.uuidString)
+            .appendingPathExtension(ext)
+        if FileManager.default.fileExists(atPath: destination.path) {
+            try? FileManager.default.removeItem(at: destination)
+        }
+        try FileManager.default.copyItem(at: source, to: destination)
+        readingURLs[poemID] = destination
+    }
+
+    /// Delete a poem's reading, if any.
+    func removeReading(for poemID: UUID) {
+        if let existing = readingURLs[poemID] {
+            try? FileManager.default.removeItem(at: existing)
+            readingURLs[poemID] = nil
+        }
+    }
+
     // MARK: - Poem mutations (iOS)
 
     func add(_ poem: Poem) {
@@ -96,6 +139,7 @@ final class PoemStore: ObservableObject {
     func delete(_ poem: Poem) {
         poems.removeAll { $0.id == poem.id }
         attempts = attempts.filter { $0.value.poemID != poem.id }
+        removeReading(for: poem.id)
         didChangePoems()
         saveAttempts()
     }
@@ -104,6 +148,7 @@ final class PoemStore: ObservableObject {
         let removed = offsets.map { poems[$0].id }
         poems.remove(atOffsets: offsets)
         attempts = attempts.filter { !removed.contains($0.value.poemID) }
+        removed.forEach { removeReading(for: $0) }
         didChangePoems()
         saveAttempts()
     }
@@ -210,6 +255,19 @@ final class PoemStore: ObservableObject {
            let decoded = try? JSONDecoder().decode([LineAttempt].self, from: data) {
             attempts = Dictionary(uniqueKeysWithValues: decoded.map { ($0.id, $0) })
         }
+    }
+
+    /// Scan the readings directory and map each `<poemID>.<ext>` file back to
+    /// its poem. Files are named after the poem's UUID when attached.
+    private func loadReadings() {
+        guard let files = try? FileManager.default.contentsOfDirectory(
+            at: readingsDirectory, includingPropertiesForKeys: nil) else { return }
+        var map: [UUID: URL] = [:]
+        for file in files {
+            let name = file.deletingPathExtension().lastPathComponent
+            if let id = UUID(uuidString: name) { map[id] = file }
+        }
+        readingURLs = map
     }
 
     private func savePoems() {

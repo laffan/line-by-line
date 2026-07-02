@@ -84,6 +84,12 @@ struct PoemDetailView: View {
             .controlSize(.large)
             .padding()
             .disabled(poem.practiceLines.isEmpty)
+
+            if let readingURL = store.reading(for: poem.id) {
+                Divider()
+                ReadingPlayerView(url: readingURL)
+                    .padding(.vertical, 10)
+            }
         }
     }
 }

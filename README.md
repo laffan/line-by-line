@@ -12,8 +12,10 @@ On iPhone the app is organized into three tabs:
 
 Everything else works as before:
 
-- **Editor** — add a poem with a title, author, and its lines.
-- **View mode** — read the whole poem, stanza breaks preserved.
+- **Editor** — add a poem with a title, author, its lines, and an optional
+  audio **reading** (browse for an audio file).
+- **View mode** — read the whole poem, stanza breaks preserved. If the poem has
+  a reading, a minimal audio player appears beneath the Practice button.
 - **Practice mode** — walk through the poem one line at a time: recall the next
   line, tap to reveal, then grade yourself with ✓ (remembered) or ✗ (forgot).
   Past lines stay visible, upcoming lines stay blurred.
@@ -40,8 +42,9 @@ LineByLine/                  iOS app
   MemorizeView.swift         Poems in progress, most recent session first
   SearchView.swift           PoetryDB search + add-to-library buttons
   PoetryDBService.swift      PoetryDB API client + result model
-  PoemEditorView.swift       Title + content editor
-  PoemDetailView.swift       View mode + attempts card
+  PoemEditorView.swift       Title + content editor + reading picker
+  PoemDetailView.swift       View mode + attempts card + reading player
+  ReadingPlayerView.swift    Minimal audio player for a poem's reading
   PracticeView.swift         Line-by-line practice with grading
   StatsView.swift            Attempts card + per-line breakdown
 
@@ -58,6 +61,10 @@ via `WatchConnectivity`. Practice *attempts* are append-only records with unique
 ids, so the phone and watch merge their logs by union — practice on either
 device counts toward the same success rates. Each device echoes its merged state
 back once when it learns something new, so the two converge.
+
+Readings are stored as audio files in an `Application Support/Readings` folder,
+named after each poem's id. They stay on the iPhone and are not synced to the
+watch (audio files are large and playback is iOS-only).
 
 ## Building
 
