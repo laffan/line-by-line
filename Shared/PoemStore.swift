@@ -48,6 +48,33 @@ final class PoemStore: ObservableObject {
         poems.first { $0.id == id }
     }
 
+    /// The most recent practice attempt for a poem, if it has ever been
+    /// practiced.
+    func lastPracticed(for poemID: UUID) -> Date? {
+        attempts.values
+            .filter { $0.poemID == poemID }
+            .map(\.date)
+            .max()
+    }
+
+    /// Poems the user is currently memorizing: every poem that has at least one
+    /// practice attempt, ordered by its most recent session (newest first).
+    var poemsInProgress: [Poem] {
+        poems
+            .compactMap { poem in lastPracticed(for: poem.id).map { (poem, $0) } }
+            .sorted { $0.1 > $1.1 }
+            .map(\.0)
+    }
+
+    /// Whether a poem with the same title and author is already saved. Used to
+    /// avoid adding the same PoetryDB result twice.
+    func containsPoem(title: String, author: String) -> Bool {
+        poems.contains {
+            $0.title.caseInsensitiveCompare(title) == .orderedSame &&
+            $0.author.caseInsensitiveCompare(author) == .orderedSame
+        }
+    }
+
     // MARK: - Poem mutations (iOS)
 
     func add(_ poem: Poem) {

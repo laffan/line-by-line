@@ -6,7 +6,7 @@ struct LineByLineApp: App {
 
     var body: some Scene {
         WindowGroup {
-            PoemListView()
+            RootView()
                 .environmentObject(store)
         }
     }

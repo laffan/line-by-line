@@ -12,7 +12,7 @@ struct PoemListView: View {
                     ContentUnavailableView {
                         Label("No Poems Yet", systemImage: "text.book.closed")
                     } description: {
-                        Text("Tap + to add a poem you'd like to memorize.")
+                        Text("Tap + to add a poem, or find one in the Search tab.")
                     }
                 } else {
                     List {
@@ -25,7 +25,7 @@ struct PoemListView: View {
                     }
                 }
             }
-            .navigationTitle("Line by Line")
+            .navigationTitle("Library")
             .navigationDestination(for: UUID.self) { id in
                 PoemDetailView(poemID: id)
             }

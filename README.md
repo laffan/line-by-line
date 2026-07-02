@@ -2,6 +2,16 @@
 
 A small SwiftUI app for **iOS and watchOS** that helps you memorize poetry.
 
+On iPhone the app is organized into three tabs:
+
+- **Library** — every poem you've saved.
+- **Memorize** — the poems you're currently practicing, ordered by most recent
+  session (newest first) so the poem you're working on is always on top.
+- **Search** — look up poems on [PoetryDB](https://poetrydb.org) by title or
+  author, preview them, and add any result to your library with one tap.
+
+Everything else works as before:
+
 - **Editor** — add a poem with a title, author, and its lines.
 - **View mode** — read the whole poem, stanza breaks preserved.
 - **Practice mode** — walk through the poem one line at a time: recall the next
@@ -25,7 +35,11 @@ Shared/                      Code shared by both apps
 
 LineByLine/                  iOS app
   LineByLineApp.swift
-  PoemListView.swift         List of poems + add button
+  RootView.swift             Library / Memorize / Search tab bar
+  PoemListView.swift         Library: list of poems + add button
+  MemorizeView.swift         Poems in progress, most recent session first
+  SearchView.swift           PoetryDB search + add-to-library buttons
+  PoetryDBService.swift      PoetryDB API client + result model
   PoemEditorView.swift       Title + content editor
   PoemDetailView.swift       View mode + attempts card
   PracticeView.swift         Line-by-line practice with grading
