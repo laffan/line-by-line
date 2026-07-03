@@ -22,6 +22,16 @@ struct PoetryDBPoem: Codable, Identifiable, Hashable {
     }
 }
 
+/// A lightweight {title, author} pair used for browsing. PoetryDB has no
+/// endpoint that lists titles with their authors, so we build an index of these
+/// by asking each author for their titles.
+struct PoemStub: Codable, Hashable, Identifiable {
+    let title: String
+    let author: String
+
+    var id: String { "\(title)|\(author)" }
+}
+
 /// The field to search PoetryDB by.
 enum PoetryDBField: String, CaseIterable, Identifiable {
     case title
@@ -104,6 +114,32 @@ enum PoetryDBService {
         return poem
     }
 
+    /// The {title, author} pairs for one author (title,author output only) —
+    /// the building block of the title index.
+    static func titles(byAuthor author: String) async throws -> [PoemStub] {
+        let url = base
+            .appendingPathComponent("author")
+            .appendingPathComponent(author)
+            .appendingPathComponent("author,title")
+        let data = try await fetchData(from: url)
+        if let stubs = try? JSONDecoder().decode([PoemStub].self, from: data) {
+            return stubs
+        }
+        if (try? JSONDecoder().decode(PoetryDBStatus.self, from: data)) != nil {
+            throw PoetryDBError.notFound
+        }
+        throw PoetryDBError.network
+    }
+
+    /// Fetch the full poem matching an exact title and author.
+    static func poem(title: String, author: String) async throws -> PoetryDBPoem? {
+        // Combined input: /title,author/<title>;<author>
+        let url = base
+            .appendingPathComponent("title,author")
+            .appendingPathComponent("\(title);\(author)")
+        return try await fetchPoems(from: url).first
+    }
+
     // MARK: - Networking
 
     private static func fetchData(from url: URL) async throws -> Data {
@@ -154,20 +190,28 @@ enum PoetryDBService {
     }
 }
 
-/// Caches PoetryDB's full title and author catalogs on disk so they're fetched
-/// from the network only once, then reused across launches until the user
-/// manually refreshes.
+/// Caches PoetryDB's browse data on disk so it's fetched from the network only
+/// once, then reused across launches until the user manually refreshes.
 ///
-/// The catalogs are large but static, so they live in the Caches directory as
-/// plain JSON. If the cache is ever evicted, it's simply re-fetched on demand.
+/// Two catalogs are cached in the Caches directory as plain JSON:
+/// - `authors`: the list of every poet (a single request).
+/// - `poems`: a {title, author} index for browsing titles. PoetryDB has no
+///   endpoint that lists titles with their authors, so this index is built by
+///   asking each author for their titles — a heavier, one-time download.
 @MainActor
 final class PoetryCatalogStore: ObservableObject {
-    @Published private(set) var titles: [String] = []
     @Published private(set) var authors: [String] = []
+    @Published private(set) var poems: [PoemStub] = []
     /// When each catalog was last downloaded, keyed by ``PoetryDBField/rawValue``.
     @Published private(set) var updatedAt: [String: Date] = [:]
 
+    /// Progress (0...1) while the title index is being built.
+    @Published private(set) var indexProgress: Double = 0
+    @Published private(set) var isBuildingIndex = false
+
     private let directory: URL
+    private let authorsURL: URL
+    private let indexURL: URL
     private let updatedURL: URL
 
     init(directoryName: String = "PoetryCatalog") {
@@ -176,71 +220,105 @@ final class PoetryCatalogStore: ObservableObject {
             .appendingPathComponent(directoryName, isDirectory: true)
         try? FileManager.default.createDirectory(at: base, withIntermediateDirectories: true)
         directory = base
+        authorsURL = base.appendingPathComponent("authors.json")
+        indexURL = base.appendingPathComponent("index.json")
         updatedURL = base.appendingPathComponent("updated.json")
 
-        titles = loadDisk(for: .title)
-        authors = loadDisk(for: .author)
-        if let data = try? Data(contentsOf: updatedURL),
-           let decoded = try? JSONDecoder().decode([String: Date].self, from: data) {
-            updatedAt = decoded
-        }
+        authors = decode([String].self, from: authorsURL) ?? []
+        poems = decode([PoemStub].self, from: indexURL) ?? []
+        updatedAt = decode([String: Date].self, from: updatedURL) ?? [:]
     }
 
     // MARK: - Reads
-
-    func values(for field: PoetryDBField) -> [String] {
-        field == .title ? titles : authors
-    }
-
-    func isCached(_ field: PoetryDBField) -> Bool {
-        !values(for: field).isEmpty
-    }
 
     func lastUpdated(_ field: PoetryDBField) -> Date? {
         updatedAt[field.rawValue]
     }
 
-    // MARK: - Loading
+    // MARK: - Authors (cheap)
 
-    /// Fetch a catalog from the network only if nothing is cached yet.
-    func ensureLoaded(_ field: PoetryDBField) async throws {
-        guard !isCached(field) else { return }
-        try await refresh(field)
+    func ensureAuthorsLoaded() async throws {
+        guard authors.isEmpty else { return }
+        try await refreshAuthors()
     }
 
-    /// Force a fresh download of a catalog and overwrite the cache.
-    func refresh(_ field: PoetryDBField) async throws {
-        let values = try await PoetryDBService.catalog(for: field)
-        switch field {
-        case .title: titles = values
-        case .author: authors = values
+    func refreshAuthors() async throws {
+        let values = try await PoetryDBService.catalog(for: .author)
+        authors = values
+        write(values, to: authorsURL)
+        markUpdated(.author)
+    }
+
+    // MARK: - Title index (expensive: one request per author)
+
+    func ensurePoemIndexLoaded() async throws {
+        guard poems.isEmpty else { return }
+        try await refreshPoemIndex()
+    }
+
+    /// Rebuild the {title, author} index by fetching every author's titles.
+    /// Individual author failures are skipped so one hiccup doesn't fail the
+    /// whole build.
+    func refreshPoemIndex() async throws {
+        isBuildingIndex = true
+        indexProgress = 0
+        defer { isBuildingIndex = false }
+
+        let names = authors.isEmpty
+            ? try await PoetryDBService.catalog(for: .author)
+            : authors
+        if authors.isEmpty {
+            authors = names
+            write(names, to: authorsURL)
+            markUpdated(.author)
         }
-        saveDisk(values, for: field)
-        updatedAt[field.rawValue] = Date()
-        saveUpdated()
+
+        var collected: [PoemStub] = []
+        var completed = 0
+        let total = max(names.count, 1)
+
+        await withTaskGroup(of: [PoemStub].self) { group in
+            var iterator = names.makeIterator()
+            let maxConcurrent = 6
+            for _ in 0..<maxConcurrent {
+                guard let name = iterator.next() else { break }
+                group.addTask { (try? await PoetryDBService.titles(byAuthor: name)) ?? [] }
+            }
+            for await stubs in group {
+                collected.append(contentsOf: stubs)
+                completed += 1
+                indexProgress = Double(completed) / Double(total)
+                if let name = iterator.next() {
+                    group.addTask { (try? await PoetryDBService.titles(byAuthor: name)) ?? [] }
+                }
+            }
+        }
+
+        // Don't cache a half-built index if the build was cancelled (e.g. the
+        // user navigated away); let it rebuild cleanly next time.
+        if Task.isCancelled { return }
+
+        poems = collected.sorted {
+            $0.title.localizedCaseInsensitiveCompare($1.title) == .orderedAscending
+        }
+        write(poems, to: indexURL)
+        markUpdated(.title)
     }
 
     // MARK: - Persistence
 
-    private func fileURL(for field: PoetryDBField) -> URL {
-        directory.appendingPathComponent("\(field.rawValue).json")
+    private func markUpdated(_ field: PoetryDBField) {
+        updatedAt[field.rawValue] = Date()
+        write(updatedAt, to: updatedURL)
     }
 
-    private func loadDisk(for field: PoetryDBField) -> [String] {
-        guard let data = try? Data(contentsOf: fileURL(for: field)),
-              let decoded = try? JSONDecoder().decode([String].self, from: data) else {
-            return []
-        }
-        return decoded
+    private func decode<T: Decodable>(_ type: T.Type, from url: URL) -> T? {
+        guard let data = try? Data(contentsOf: url) else { return nil }
+        return try? JSONDecoder().decode(type, from: data)
     }
 
-    private func saveDisk(_ values: [String], for field: PoetryDBField) {
-        guard let data = try? JSONEncoder().encode(values) else { return }
-        try? data.write(to: fileURL(for: field), options: .atomic)
-    }
-
-    private func saveUpdated() {
-        guard let data = try? JSONEncoder().encode(updatedAt) else { return }
-        try? data.write(to: updatedURL, options: .atomic)
+    private func write<T: Encodable>(_ value: T, to url: URL) {
+        guard let data = try? JSONEncoder().encode(value) else { return }
+        try? data.write(to: url, options: .atomic)
     }
 }

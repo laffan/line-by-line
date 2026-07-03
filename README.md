@@ -8,10 +8,11 @@ On iPhone the app is organized into three tabs:
 - **Memorize** — the poems you're currently practicing, ordered by most recent
   session (newest first) so the poem you're working on is always on top.
 - **Search** — browse the full [PoetryDB](https://poetrydb.org) catalog of
-  titles or authors, filter it with the search field, and preview and add any
-  poem with one tap. A **Random** button pulls up a surprise poem, and the
-  catalog is cached on disk so it downloads only once (pull to refresh to
-  re-download).
+  titles (each showing its author) or authors, filter it with the search field,
+  and preview and add any poem with one tap. A **Random** button pulls up a
+  surprise poem. The catalog is cached on disk so it downloads only once (pull
+  to refresh to re-download); the title list is built from each author's poems
+  the first time you browse it, since PoetryDB has no single title+author feed.
 
 Everything else works as before:
 

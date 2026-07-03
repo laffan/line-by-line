@@ -24,14 +24,26 @@ struct SearchView: View {
         case failed(String)
     }
 
-    private var names: [String] {
-        catalog.values(for: field)
+    private var trimmedQuery: String {
+        query.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
-    private var filtered: [String] {
-        let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty else { return names }
-        return names.filter { $0.localizedCaseInsensitiveContains(trimmed) }
+    private var filteredAuthors: [String] {
+        guard !trimmedQuery.isEmpty else { return catalog.authors }
+        return catalog.authors.filter { $0.localizedCaseInsensitiveContains(trimmedQuery) }
+    }
+
+    private var filteredPoems: [PoemStub] {
+        guard !trimmedQuery.isEmpty else { return catalog.poems }
+        return catalog.poems.filter { $0.title.localizedCaseInsensitiveContains(trimmedQuery) }
+    }
+
+    private var resultCount: Int {
+        field == .title ? filteredPoems.count : filteredAuthors.count
+    }
+
+    private var isEmptyResult: Bool {
+        field == .title ? filteredPoems.isEmpty : filteredAuthors.isEmpty
     }
 
     var body: some View {
@@ -85,8 +97,7 @@ struct SearchView: View {
     private var content: some View {
         switch phase {
         case .loading:
-            ProgressView()
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            loadingView
         case .failed(let message):
             ContentUnavailableView {
                 Label("Couldn't Load", systemImage: "exclamationmark.triangle")
@@ -98,7 +109,7 @@ struct SearchView: View {
                 }
             }
         case .loaded:
-            if filtered.isEmpty {
+            if isEmptyResult {
                 ContentUnavailableView.search(text: query)
             } else {
                 catalogList
@@ -106,20 +117,49 @@ struct SearchView: View {
         }
     }
 
+    @ViewBuilder
+    private var loadingView: some View {
+        if field == .title && catalog.isBuildingIndex {
+            VStack(spacing: 12) {
+                ProgressView(value: catalog.indexProgress)
+                    .progressViewStyle(.linear)
+                    .frame(maxWidth: 240)
+                Text("Building the poem list… this happens once.")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+        } else {
+            ProgressView()
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+        }
+    }
+
+    @ViewBuilder
     private var catalogList: some View {
-        List(filtered, id: \.self) { name in
-            switch field {
-            case .author:
+        switch field {
+        case .author:
+            List(filteredAuthors, id: \.self) { name in
                 NavigationLink(value: name) {
                     Text(name)
                 }
-            case .title:
+            }
+            .listStyle(.plain)
+            .refreshable { await refresh() }
+            .safeAreaInset(edge: .bottom) { updatedFooter }
+        case .title:
+            List(filteredPoems) { poem in
                 Button {
-                    fetchTitle(name)
+                    fetchPoem(poem)
                 } label: {
                     HStack {
-                        Text(name)
-                            .foregroundStyle(.primary)
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(poem.title)
+                                .foregroundStyle(.primary)
+                            Text(poem.author)
+                                .font(.subheadline)
+                                .foregroundStyle(.secondary)
+                        }
                         Spacer()
                         Image(systemName: "chevron.right")
                             .font(.caption.weight(.semibold))
@@ -127,16 +167,16 @@ struct SearchView: View {
                     }
                 }
             }
+            .listStyle(.plain)
+            .refreshable { await refresh() }
+            .safeAreaInset(edge: .bottom) { updatedFooter }
         }
-        .listStyle(.plain)
-        .refreshable { await refresh() }
-        .safeAreaInset(edge: .bottom) { updatedFooter }
     }
 
     @ViewBuilder
     private var updatedFooter: some View {
         if let updated = catalog.lastUpdated(field) {
-            Text("\(filtered.count) \(field.plural) · updated \(updated.formatted(.relative(presentation: .named))) · pull to refresh")
+            Text("\(resultCount) \(field.plural) · updated \(updated.formatted(.relative(presentation: .named))) · pull to refresh")
                 .font(.caption2)
                 .foregroundStyle(.secondary)
                 .frame(maxWidth: .infinity)
@@ -153,14 +193,21 @@ struct SearchView: View {
 
     // MARK: - Loading
 
+    private var isCurrentCached: Bool {
+        field == .title ? !catalog.poems.isEmpty : !catalog.authors.isEmpty
+    }
+
     private func loadCatalogIfNeeded() async {
-        guard !catalog.isCached(field) else {
+        if isCurrentCached {
             phase = .loaded
             return
         }
         phase = .loading
         do {
-            try await catalog.ensureLoaded(field)
+            switch field {
+            case .author: try await catalog.ensureAuthorsLoaded()
+            case .title: try await catalog.ensurePoemIndexLoaded()
+            }
             phase = .loaded
         } catch {
             phase = .failed(message(for: error))
@@ -170,19 +217,22 @@ struct SearchView: View {
     /// Force a re-download of the current catalog (pull-to-refresh / Try Again).
     private func refresh() async {
         do {
-            try await catalog.refresh(field)
+            switch field {
+            case .author: try await catalog.refreshAuthors()
+            case .title: try await catalog.refreshPoemIndex()
+            }
             phase = .loaded
         } catch {
             // Keep showing any cached list; only fall back to the error state
             // when there's nothing to show.
-            if !catalog.isCached(field) {
+            if !isCurrentCached {
                 phase = .failed(message(for: error))
             }
         }
     }
 
-    private func fetchTitle(_ title: String) {
-        runSingleFetch { try await PoetryDBService.search(title, by: .title).first }
+    private func fetchPoem(_ stub: PoemStub) {
+        runSingleFetch { try await PoetryDBService.poem(title: stub.title, author: stub.author) }
     }
 
     private func fetchRandom() {
@@ -341,16 +391,13 @@ private struct SearchPreviewView: View {
         VStack(spacing: 0) {
             ScrollView {
                 VStack(alignment: .leading, spacing: 8) {
-                    Text(poem.author)
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-                        .padding(.bottom, 8)
+                    PoemHeader(title: poem.title, author: poem.author)
                     ForEach(Array(poem.lines.enumerated()), id: \.offset) { _, line in
                         if line.trimmingCharacters(in: .whitespaces).isEmpty {
                             Color.clear.frame(height: 12)
                         } else {
                             Text(line)
-                                .font(.title3)
+                                .font(.body)
                         }
                     }
                 }
@@ -373,7 +420,7 @@ private struct SearchPreviewView: View {
             .padding()
             .disabled(alreadyAdded)
         }
-        .navigationTitle(poem.title)
+        .navigationTitle("")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .cancellationAction) {

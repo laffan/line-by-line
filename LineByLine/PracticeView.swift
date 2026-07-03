@@ -62,11 +62,11 @@ struct PracticeView: View {
     private func lineView(index i: Int, text: String) -> some View {
         if i < index {
             Text(text)
-                .font(.title3)
+                .font(.body)
                 .foregroundStyle(.secondary)
         } else if i == index {
             Text(text)
-                .font(.title2.weight(.semibold))
+                .font(.title3.weight(.semibold))
                 .padding()
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .background(.tint.opacity(0.12), in: RoundedRectangle(cornerRadius: 12))
@@ -82,7 +82,7 @@ struct PracticeView: View {
                 .onTapGesture { reveal() }
         } else {
             Text(text)
-                .font(.title3)
+                .font(.body)
                 .blur(radius: 8)
                 .opacity(0.4)
         }
