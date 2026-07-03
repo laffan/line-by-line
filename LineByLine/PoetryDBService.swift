@@ -29,11 +29,19 @@ enum PoetryDBField: String, CaseIterable, Identifiable {
     var id: String { rawValue }
     var label: String { rawValue.capitalized }
 
-    /// Placeholder text for the search field.
+    /// Placeholder text for the search field, which filters the catalog.
     var prompt: String {
         switch self {
-        case .title: return "Search by title"
-        case .author: return "Search by author"
+        case .title: return "Filter titles"
+        case .author: return "Filter authors"
+        }
+    }
+
+    /// Plural noun for the catalog of this field.
+    var plural: String {
+        switch self {
+        case .title: return "titles"
+        case .author: return "authors"
         }
     }
 }
@@ -61,6 +69,7 @@ enum PoetryDBError: LocalizedError {
 enum PoetryDBService {
     private static let base = URL(string: "https://poetrydb.org")!
 
+    /// Search for poems whose `field` contains `query` (partial, case-insensitive).
     static func search(_ query: String, by field: PoetryDBField) async throws -> [PoetryDBPoem] {
         let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return [] }
@@ -70,7 +79,33 @@ enum PoetryDBService {
         let url = base
             .appendingPathComponent(field.rawValue)
             .appendingPathComponent(trimmed)
+        return try await fetchPoems(from: url)
+    }
 
+    /// The full catalog for a field: every title, or every author.
+    ///
+    /// `GET /title` → `{ "titles": [...] }`, `GET /author` → `{ "authors": [...] }`.
+    static func catalog(for field: PoetryDBField) async throws -> [String] {
+        let url = base.appendingPathComponent(field.rawValue)
+        let data = try await fetchData(from: url)
+        guard let catalog = try? JSONDecoder().decode(Catalog.self, from: data) else {
+            throw PoetryDBError.network
+        }
+        return catalog.values(for: field)
+    }
+
+    /// A single random poem.
+    static func random() async throws -> PoetryDBPoem {
+        let url = base.appendingPathComponent("random")
+        guard let poem = try await fetchPoems(from: url).first else {
+            throw PoetryDBError.notFound
+        }
+        return poem
+    }
+
+    // MARK: - Networking
+
+    private static func fetchData(from url: URL) async throws -> Data {
         let data: Data
         let response: URLResponse
         do {
@@ -78,23 +113,37 @@ enum PoetryDBService {
         } catch {
             throw PoetryDBError.network
         }
-
         if let http = response as? HTTPURLResponse, http.statusCode == 404 {
             throw PoetryDBError.notFound
         }
+        return data
+    }
 
+    private static func fetchPoems(from url: URL) async throws -> [PoetryDBPoem] {
+        let data = try await fetchData(from: url)
         let decoder = JSONDecoder()
         if let poems = try? decoder.decode([PoetryDBPoem].self, from: data) {
             return poems
         }
-
         // No matches: PoetryDB returns a `{ "status": ..., "reason": ... }`
         // object instead of an array.
         if (try? decoder.decode(PoetryDBStatus.self, from: data)) != nil {
             throw PoetryDBError.notFound
         }
-
         throw PoetryDBError.network
+    }
+
+    /// The `{ "titles": [...] }` / `{ "authors": [...] }` catalog shape.
+    private struct Catalog: Decodable {
+        let titles: [String]?
+        let authors: [String]?
+
+        func values(for field: PoetryDBField) -> [String] {
+            switch field {
+            case .title: return titles ?? []
+            case .author: return authors ?? []
+            }
+        }
     }
 
     /// The shape PoetryDB uses to signal "no results".

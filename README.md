@@ -7,8 +7,11 @@ On iPhone the app is organized into three tabs:
 - **Library** — every poem you've saved.
 - **Memorize** — the poems you're currently practicing, ordered by most recent
   session (newest first) so the poem you're working on is always on top.
-- **Search** — look up poems on [PoetryDB](https://poetrydb.org) by title or
-  author, preview them, and add any result to your library with one tap.
+- **Search** — browse the full [PoetryDB](https://poetrydb.org) catalog of
+  titles or authors, filter it with the search field, and preview and add any
+  poem with one tap. A **Random** button pulls up a surprise poem, and the
+  catalog is cached on disk so it downloads only once (pull to refresh to
+  re-download).
 
 Everything else works as before:
 
@@ -40,8 +43,9 @@ LineByLine/                  iOS app
   RootView.swift             Library / Memorize / Search tab bar
   PoemListView.swift         Library: list of poems + add button
   MemorizeView.swift         Poems in progress, most recent session first
-  SearchView.swift           PoetryDB search + add-to-library buttons
+  SearchView.swift           PoetryDB catalog browser, Random, add buttons
   PoetryDBService.swift      PoetryDB API client + result model
+  PoetryCatalogStore.swift   On-disk cache of the title/author catalogs
   PoemEditorView.swift       Title + content editor + reading picker
   PoemDetailView.swift       View mode + attempts card + reading player
   ReadingPlayerView.swift    Minimal audio player for a poem's reading
