@@ -44,8 +44,7 @@ LineByLine/                  iOS app
   PoemListView.swift         Library: list of poems + add button
   MemorizeView.swift         Poems in progress, most recent session first
   SearchView.swift           PoetryDB catalog browser, Random, add buttons
-  PoetryDBService.swift      PoetryDB API client + result model
-  PoetryCatalogStore.swift   On-disk cache of the title/author catalogs
+  PoetryDBService.swift      PoetryDB API client + on-disk catalog cache
   PoemEditorView.swift       Title + content editor + reading picker
   PoemDetailView.swift       View mode + attempts card + reading player
   ReadingPlayerView.swift    Minimal audio player for a poem's reading
