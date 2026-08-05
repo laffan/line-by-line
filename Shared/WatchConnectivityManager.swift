@@ -3,20 +3,19 @@ import Foundation
 import WatchConnectivity
 #endif
 
-/// The data exchanged between the phone and the watch.
+/// The data the phone sends to the watch.
 ///
-/// `poems` is only sent by the phone (the source of truth for poem content).
-/// `attempts` flows in both directions and is merged by union on each device.
+/// Both fields are owned by the phone. Recorded readings are deliberately left
+/// out — audio stays on the device that recorded it.
 struct SyncPayload: Codable {
     var poems: [Poem]?
-    var attempts: [LineAttempt]?
+    var showLineNumbers: Bool?
 }
 
 /// Bridges the iOS and watchOS apps using `WatchConnectivity`.
 ///
-/// Poem content is owned by the phone and pushed to the watch. Practice
-/// attempts are recorded on either device and merged together, so success
-/// rates reflect practice from both.
+/// Poems are owned by the phone and pushed to the watch. The watch only ever
+/// asks for a fresh copy.
 final class WatchConnectivityManager: NSObject {
     static let shared = WatchConnectivityManager()
 

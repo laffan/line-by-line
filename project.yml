@@ -32,6 +32,9 @@ targets:
         ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
         INFOPLIST_KEY_UIApplicationSceneManifest_Generation: "YES"
         INFOPLIST_KEY_UILaunchScreen_Generation: "YES"
+        INFOPLIST_KEY_NSMicrophoneUsageDescription: "Line by Line records your reading of a poem so you can listen back to it."
+        INFOPLIST_KEY_NSLocationWhenInUseUsageDescription: "Line by Line uses your location so you can set a cue for where you are standing."
+        INFOPLIST_KEY_NSLocationAlwaysAndWhenInUseUsageDescription: "Line by Line watches the places you choose so it can cue you to recall a poem when you arrive or leave, even when the app is closed."
         TARGETED_DEVICE_FAMILY: "1,2"
     dependencies:
       - target: LineByLine Watch App
