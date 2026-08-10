@@ -5,7 +5,7 @@ A small SwiftUI app for **iOS and watchOS** that helps you memorize poetry.
 - **Editor** — a poem's title, author, a recorded or imported reading of it, and
   its lines.
 - **The poem screen** — the poem set on paper-toned ground in a serif, stanza
-  breaks preserved, with an optional line-number margin.
+  breaks preserved, with an optional line-number margin on the phone.
 - **Practice, in place** — practice isn't a separate screen. Press *Practice*
   and the poem blacks out where it sits; each tap (on the poem, or on *Next
   line*) lifts one more bar. Four modes:
@@ -19,7 +19,10 @@ A small SwiftUI app for **iOS and watchOS** that helps you memorize poetry.
   when you arrive there or leave, the way Reminders does. Each cue becomes one
   repeating geofenced notification; tapping it opens that poem.
 - **Watch sync** — poems entered on iPhone sync to the paired Apple Watch, which
-  practises them the same way, on the same screen.
+  practises them the same way, on the same screen. There the session opens from
+  the button in the top-right corner, the mode sits at the top of the page while
+  you work, and a line you uncover holds still for two seconds before the page
+  moves on. The wrist gets no line-number margin.
 
 ## Project layout
 
@@ -52,9 +55,9 @@ LineByLine Watch App/        watchOS app
 ```
 
 The iPhone is the source of truth: it persists poems to disk (JSON in the app's
-Application Support directory) and pushes them, plus the line-number preference,
-to the watch via `WatchConnectivity`. Recorded readings stay on the phone —
-audio doesn't travel over the connectivity session.
+Application Support directory) and pushes them to the watch via
+`WatchConnectivity`. Recorded readings stay on the phone — audio doesn't travel
+over the connectivity session.
 
 Location cues are rebuilt from scratch whenever settings change: each enabled cue
 becomes one repeating `UNLocationNotificationTrigger`, so iOS does the monitoring
