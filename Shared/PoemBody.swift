@@ -65,9 +65,8 @@ private struct LineRow: View {
                     .padding(.trailing, 10)
             }
 
-            Text(line.text)
+            VerseText(text: line.text)
                 .font(Theme.verse)
-                .lineSpacing(6)
                 .foregroundStyle(state == .context ? Theme.inkFaint : Theme.ink)
                 .opacity(isCovered ? 0 : 1)
                 .overlay {
@@ -81,5 +80,130 @@ private struct LineRow: View {
 
             Spacer(minLength: 0)
         }
+    }
+}
+
+/// One line of verse, set so that its turnovers — the rows a long line spills
+/// onto when the measure is too narrow — sit in by a few spaces, the way verse
+/// is set in print. A wrapped line then reads as one line, not two.
+private struct VerseText: View {
+    let text: String
+
+    /// How far a turnover sits in, in spaces of the verse font.
+    private static let turnoverSpaces = 3
+    /// The gap between the rows of one wrapped line.
+    private static let rowGap: CGFloat = 6
+
+    var body: some View {
+        let (words, spacesBefore) = Self.tokens(from: text)
+        TurnoverLayout(spacesBefore: spacesBefore,
+                       indentSpaces: Self.turnoverSpaces,
+                       rowGap: Self.rowGap) {
+            // The probe: one non-breaking space the layout measures to learn
+            // the width of a space in the current font. It draws nothing.
+            Text("\u{00A0}")
+            ForEach(Array(words.enumerated()), id: \.offset) { _, word in
+                Text(word)
+            }
+        }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(text)
+    }
+
+    /// Split a line into words and the number of spaces before each, so
+    /// deliberate spacing inside a line survives the trip through the layout.
+    private static func tokens(from text: String) -> ([String], [Int]) {
+        var words: [String] = []
+        var spacesBefore: [Int] = []
+        var word = ""
+        var pending = 0
+        for character in text {
+            if character.isWhitespace {
+                if !word.isEmpty {
+                    words.append(word)
+                    word = ""
+                }
+                pending += 1
+            } else {
+                if word.isEmpty {
+                    spacesBefore.append(pending)
+                    pending = 0
+                }
+                word.append(character)
+            }
+        }
+        if !word.isEmpty { words.append(word) }
+        return (words, spacesBefore)
+    }
+}
+
+/// The typesetter behind ``VerseText``: words run left to right, break at
+/// spaces, and every row after the first is pushed in by the indent.
+///
+/// The first subview must be the measuring probe; the rest are the words, in
+/// order, matching `spacesBefore` index for index.
+private struct TurnoverLayout: Layout {
+    let spacesBefore: [Int]
+    let indentSpaces: Int
+    let rowGap: CGFloat
+
+    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout Void) -> CGSize {
+        typeset(subviews, width: proposal.width ?? .infinity).size
+    }
+
+    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout Void) {
+        // The probe is blank — park it in the corner.
+        subviews[0].place(at: bounds.origin, proposal: .unspecified)
+        let origins = typeset(subviews, width: bounds.width).origins
+        for (word, origin) in zip(subviews.dropFirst(), origins) {
+            word.place(at: CGPoint(x: bounds.minX + origin.x, y: bounds.minY + origin.y),
+                       proposal: .unspecified)
+        }
+    }
+
+    // The first word always sits on the first row, so its baseline is the
+    // layout's. Without this the line-number gutter would align to the bottom
+    // edge instead.
+    func explicitAlignment(of guide: VerticalAlignment, in bounds: CGRect,
+                           proposal: ProposedViewSize, subviews: Subviews,
+                           cache: inout Void) -> CGFloat? {
+        guard guide == .firstTextBaseline, subviews.count > 1 else { return nil }
+        return subviews[1].dimensions(in: .unspecified)[.firstTextBaseline]
+    }
+
+    private func typeset(_ subviews: Subviews, width: CGFloat) -> (origins: [CGPoint], size: CGSize) {
+        let space = subviews[0].sizeThatFits(.unspecified).width
+        let indent = CGFloat(indentSpaces) * space
+
+        var origins: [CGPoint] = []
+        var x: CGFloat = 0
+        var y: CGFloat = 0
+        var rowHeight: CGFloat = 0
+        var widest: CGFloat = 0
+        var isRowStart = true
+
+        for (index, word) in subviews.dropFirst().enumerated() {
+            let size = word.sizeThatFits(.unspecified)
+            // Spaces inside the line count; spaces eaten by a break do not.
+            // A line's own leading spaces (index 0) always count.
+            if !isRowStart || index == 0 {
+                x += CGFloat(spacesBefore[index]) * space
+            }
+            if !isRowStart, x + size.width > width {
+                y += rowHeight + rowGap
+                x = indent
+                rowHeight = 0
+            }
+            origins.append(CGPoint(x: x, y: y))
+            x += size.width
+            rowHeight = max(rowHeight, size.height)
+            widest = max(widest, x)
+            isRowStart = false
+        }
+
+        guard !origins.isEmpty else {
+            return ([], CGSize(width: 0, height: subviews[0].sizeThatFits(.unspecified).height))
+        }
+        return (origins, CGSize(width: widest, height: y + rowHeight))
     }
 }
