@@ -184,10 +184,13 @@ private struct TurnoverLayout: Layout {
 
         for (index, word) in subviews.dropFirst().enumerated() {
             let size = word.sizeThatFits(.unspecified)
+            // One space unless the line asked for more. Read defensively: the
+            // words are a ForEach, so a bad line should set oddly, not crash.
+            let gap = index < spacesBefore.count ? spacesBefore[index] : 1
             // Spaces inside the line count; spaces eaten by a break do not.
             // A line's own leading spaces (index 0) always count.
             if !isRowStart || index == 0 {
-                x += CGFloat(spacesBefore[index]) * space
+                x += CGFloat(gap) * space
             }
             if !isRowStart, x + size.width > width {
                 y += rowHeight + rowGap
