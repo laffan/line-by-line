@@ -54,12 +54,27 @@ struct PoemEditorView: View {
                 field("Reading") { readingControls }
 
                 field("Lines") {
-                    TextEditor(text: $content)
+                    // An invisible twin of the text sizes the field, so it is
+                    // always exactly as tall as the poem and the page — not the
+                    // editor — does the scrolling. The trailing space keeps the
+                    // twin honest when the poem ends on an open line: `Text`
+                    // drops a trailing newline the editor still gives a row to.
+                    Text(content.hasSuffix("\n") ? content + " " : content)
                         .font(Theme.serif(.body))
                         .lineSpacing(5)
-                        .scrollContentBackground(.hidden)
-                        .frame(minHeight: 280)
-                        .padding(.horizontal, -5)
+                        .padding(.top, 8)
+                        .padding(.bottom, 12)
+                        .opacity(0)
+                        .accessibilityHidden(true)
+                        .frame(maxWidth: .infinity, minHeight: 280, alignment: .topLeading)
+                        .overlay {
+                            TextEditor(text: $content)
+                                .font(Theme.serif(.body))
+                                .lineSpacing(5)
+                                .scrollContentBackground(.hidden)
+                                .scrollDisabled(true)
+                                .padding(.horizontal, -5)
+                        }
                 }
             }
             .foregroundStyle(Theme.ink)
