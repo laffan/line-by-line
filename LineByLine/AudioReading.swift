@@ -140,6 +140,16 @@ final class ReadingPlayer: NSObject, ObservableObject {
         timer = nil
     }
 
+    /// Jump back a few seconds — for catching a line you missed. Works while
+    /// paused too, so you can set up before pressing play.
+    func skipBack(_ seconds: TimeInterval) {
+        guard let player else { return }
+        player.currentTime = max(0, player.currentTime - seconds)
+        if player.duration > 0 {
+            progress = player.currentTime / player.duration
+        }
+    }
+
     /// Stop and forget the current file — used when the reading is replaced.
     func reset() {
         pause()

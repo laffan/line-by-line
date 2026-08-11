@@ -37,17 +37,26 @@ struct PoemDetailView: View {
         return VStack(spacing: 0) {
             ScrollViewReader { proxy in
                 ScrollView {
-                    VStack(alignment: .leading, spacing: 0) {
-                        header(for: poem)
-                        PoemBody(poem: poem,
-                                 session: session,
-                                 showLineNumbers: settings.settings.showLineNumbers)
-                            .padding(.top, 28)
-                            .padding(.bottom, 40)
+                    LazyVStack(alignment: .leading, spacing: 0, pinnedViews: .sectionHeaders) {
+                        titleBlock(for: poem)
+                            .padding(.horizontal, Theme.margin)
+                        Section {
+                            PoemBody(poem: poem,
+                                     session: session,
+                                     showLineNumbers: settings.settings.showLineNumbers)
+                                .padding(.top, 28)
+                                .padding(.bottom, 40)
+                                .padding(.horizontal, Theme.margin)
+                                .contentShape(Rectangle())
+                                .onTapGesture { if session != nil { revealNext() } }
+                        } header: {
+                            // The reading rides at the head of the poem, then
+                            // pins to the top of the screen while it scrolls by.
+                            if let reading = poem.readingFileName {
+                                readingHeader(fileName: reading)
+                            }
+                        }
                     }
-                    .padding(.horizontal, Theme.margin)
-                    .contentShape(Rectangle())
-                    .onTapGesture { if session != nil { revealNext() } }
                 }
                 .onChange(of: session?.step) { _, _ in
                     guard let index = session?.nextIndex,
@@ -66,12 +75,9 @@ struct PoemDetailView: View {
         .toolbarBackground(Theme.paper, for: .navigationBar)
         .toolbarBackground(.visible, for: .navigationBar)
         .toolbar {
-            ToolbarItem(placement: .primaryAction) {
-                Button("Edit") { isEditing = true }
-                    .font(Theme.label(.footnote))
-                    .tracking(1.2)
-                    .textCase(.uppercase)
-                    .foregroundStyle(Theme.inkSoft)
+            ToolbarItemGroup(placement: .topBarTrailing) {
+                practiceToolbarButton(lineCount: lineCount)
+                editToolbarButton
             }
         }
         .sheet(isPresented: $isEditing) {
@@ -93,7 +99,7 @@ struct PoemDetailView: View {
         .onDisappear { player.reset() }
     }
 
-    private func header(for poem: Poem) -> some View {
+    private func titleBlock(for poem: Poem) -> some View {
         VStack(alignment: .leading, spacing: 10) {
             Text(poem.displayTitle)
                 .font(Theme.serif(.largeTitle))
@@ -109,37 +115,99 @@ struct PoemDetailView: View {
                 .fill(Theme.ink)
                 .frame(width: 28, height: 1)
                 .padding(.top, 6)
-
-            if let reading = poem.readingFileName {
-                readingRow(fileName: reading)
-                    .padding(.top, 10)
-            }
         }
         .padding(.top, 12)
     }
 
+    /// The player dressed as a shelf: paper behind it and a hairline under it,
+    /// so the poem slides beneath while it's pinned.
+    private func readingHeader(fileName: String) -> some View {
+        VStack(spacing: 12) {
+            readingRow(fileName: fileName)
+                .padding(.horizontal, Theme.margin)
+            Hairline()
+        }
+        .padding(.top, 10)
+        .background(Theme.paper)
+    }
+
     private func readingRow(fileName: String) -> some View {
-        Button {
-            player.toggle(fileName: fileName)
-        } label: {
-            HStack(spacing: 12) {
+        HStack(spacing: 10) {
+            Button {
+                player.toggle(fileName: fileName)
+            } label: {
                 Image(systemName: player.isPlaying ? "pause.fill" : "play.fill")
                     .font(.system(size: 9))
                     .foregroundStyle(Theme.paper)
                     .frame(width: 24, height: 24)
                     .background(Circle().fill(Theme.ink))
-
-                Text("Reading").sectionLabel(Theme.inkSoft)
-
-                ProgressRule(fraction: player.progress)
-                    .frame(maxWidth: .infinity)
-
-                Text(formatDuration(player.duration))
-                    .font(Theme.label(.caption2, .regular).monospacedDigit())
-                    .foregroundStyle(Theme.inkFaint)
+                    .contentShape(Rectangle())
             }
+            .buttonStyle(.plain)
+            .accessibilityLabel(player.isPlaying ? "Pause reading" : "Play reading")
+
+            skipBackButton(seconds: 5, symbol: "gobackward.5")
+            skipBackButton(seconds: 15, symbol: "gobackward.15")
+
+            Text("Reading").sectionLabel(Theme.inkSoft)
+
+            ProgressRule(fraction: player.progress)
+                .frame(maxWidth: .infinity)
+
+            Text(formatDuration(player.duration))
+                .font(Theme.label(.caption2, .regular).monospacedDigit())
+                .foregroundStyle(Theme.inkFaint)
+        }
+    }
+
+    private func skipBackButton(seconds: TimeInterval, symbol: String) -> some View {
+        Button {
+            player.skipBack(seconds)
+        } label: {
+            Image(systemName: symbol)
+                .font(.system(size: 14, weight: .medium))
+                .foregroundStyle(Theme.inkSoft)
+                .frame(width: 24, height: 24)
+                .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+        .accessibilityLabel("Back \(Int(seconds)) seconds")
+    }
+
+    // MARK: - Toolbar
+
+    /// The same corner control the watch has: it opens a practice session, and
+    /// closes the one that's running.
+    private func practiceToolbarButton(lineCount: Int) -> some View {
+        Button {
+            if session == nil {
+                begin(plan, lineCount: lineCount)
+            } else {
+                end()
+            }
+        } label: {
+            Image(systemName: session == nil ? "play.fill" : "xmark")
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundStyle(session == nil ? Theme.ink : Theme.accent)
+                .frame(width: 28, height: 24)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .opacity(lineCount == 0 ? 0.3 : 1)
+        .disabled(lineCount == 0)
+        .accessibilityLabel(session == nil ? "Practice" : "End practice")
+    }
+
+    private var editToolbarButton: some View {
+        Button { isEditing = true } label: {
+            Image(systemName: "square.and.pencil")
+                .font(.system(size: 15, weight: .medium))
+                .foregroundStyle(Theme.inkSoft)
+                .frame(width: 28, height: 24)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("Edit")
     }
 
     // MARK: - Footer
