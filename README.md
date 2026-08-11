@@ -5,24 +5,27 @@ A small SwiftUI app for **iOS and watchOS** that helps you memorize poetry.
 - **Editor** — a poem's title, author, a recorded or imported reading of it, and
   its lines.
 - **The poem screen** — the poem set on paper-toned ground in a serif, stanza
-  breaks preserved, with an optional line-number margin on the phone.
-- **Practice, in place** — practice isn't a separate screen. Press *Practice*
-  and the poem blacks out where it sits; each tap (on the poem, or on *Next
+  breaks preserved, turnovers gently indented, with an optional line-number
+  margin on the phone.
+- **Practice, in place** — practice isn't a separate screen. Press *Practice* —
+  the button at the foot of the page, or the icon in the top-right corner — and
+  the poem blacks out where it sits; each tap (on the poem, or on *Next
   line*) lifts one more bar. Four modes:
   - **From the top** — down the page, the way you'd recite it.
   - **From line *n*** — start anywhere and run to the end.
   - **From the bottom** — learn the last line first and work backwards into it.
   - **Back from line *n*** — the same, starting where you choose.
 - **Readings** — record yourself reading a poem, or import an audio file, and
-  play it back from the poem screen.
+  play it back from the poem screen, where the player pins to the top of the
+  page as you scroll and can skip back five or fifteen seconds.
 - **Location cues** — pin a poem to a place and the app asks you to recall it
   when you arrive there or leave, the way Reminders does. Each cue becomes one
   repeating geofenced notification; tapping it opens that poem.
 - **Watch sync** — poems entered on iPhone sync to the paired Apple Watch, which
-  practises them the same way, on the same screen. There the session opens from
-  the button in the top-right corner, the mode sits at the top of the page while
-  you work, and a line you uncover holds still for two seconds before the page
-  moves on. The wrist gets no line-number margin.
+  practises them the same way, on the same screen, from the same corner button.
+  There the mode sits at the top of the page while you work, and a line you
+  uncover holds still for two seconds before the page moves on. The wrist gets
+  no line-number margin.
 
 ## Project layout
 
