@@ -46,14 +46,90 @@ struct SettingsView: View {
 
     private var pageSection: some View {
         section("The page") {
-            Toggle(isOn: $settings.settings.showLineNumbers) {
-                rowText("Line numbers",
-                        detail: "Number the lines in the margin, so you can start practice anywhere.")
+            VStack(alignment: .leading, spacing: 26) {
+                Toggle(isOn: $settings.settings.showLineNumbers) {
+                    rowText("Line numbers",
+                            detail: "Number the lines in the margin, so you can start practice anywhere.")
+                }
+                .toggleStyle(.switch)
+                .tint(Theme.ink)
+
+                textSizeRow
             }
-            .toggleStyle(.switch)
-            .tint(Theme.ink)
         }
     }
+
+    /// How large the poem itself is set. Only the lines move: a title stays a
+    /// title, and the app's own tracked capitals stay where they are.
+    private var textSizeRow: some View {
+        VStack(alignment: .leading, spacing: 18) {
+            HStack(alignment: .firstTextBaseline, spacing: 12) {
+                rowText("Text size",
+                        detail: "Sets the size of a poem's lines. Titles, authors, and the app's own labels keep their size.")
+                Spacer(minLength: 0)
+                Text(scaleLabel)
+                    .font(Theme.label(.caption2, .regular).monospacedDigit())
+                    .tracking(1.2)
+                    .foregroundStyle(Theme.inkFaint)
+                    .accessibilityHidden(true)
+            }
+
+            Slider(value: $settings.settings.textScale,
+                   in: AppSettings.textScaleRange,
+                   step: AppSettings.textScaleStep) {
+                Text("Text size")
+            } minimumValueLabel: {
+                sizeMark(13)
+            } maximumValueLabel: {
+                sizeMark(24)
+            }
+            .tint(Theme.ink)
+            .accessibilityValue(scaleLabel)
+
+            specimen
+        }
+    }
+
+    /// The specimen under the slider: three lines of verse drawn by the same
+    /// view the poem screen uses, at the size you're setting, so what you see
+    /// here is what the page will do — turnovers, margin, and all.
+    private var specimen: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            Text("Preview").sectionLabel(Theme.inkFaint)
+            PoemBody(poem: Self.specimenPoem,
+                     session: nil,
+                     showLineNumbers: settings.settings.showLineNumbers,
+                     textScale: settings.settings.textScale)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(16)
+        .background(Theme.card)
+        .overlay {
+            RoundedRectangle(cornerRadius: 3, style: .continuous)
+                .strokeBorder(Theme.rule, lineWidth: 1)
+        }
+        .clipShape(RoundedRectangle(cornerRadius: 3, style: .continuous))
+    }
+
+    private var scaleLabel: String {
+        "\(Int((settings.settings.textScale * 100).rounded()))%"
+    }
+
+    /// The A at either end of the slider, set in the poem's own serif.
+    private func sizeMark(_ size: CGFloat) -> some View {
+        Text("A")
+            .font(Theme.serif(size: size))
+            .foregroundStyle(Theme.inkFaint)
+            .accessibilityHidden(true)
+    }
+
+    /// Dickinson, out of copyright, and long enough in the third line to show
+    /// a turnover at the larger sizes.
+    private static let specimenPoem = Poem(content: """
+        Hope is the thing with feathers
+        That perches in the soul,
+        And sings the tune without the words,
+        """)
 
     // MARK: - Location cues
 

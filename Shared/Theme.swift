@@ -37,20 +37,30 @@ enum Theme {
         .system(style, design: .serif).weight(weight)
     }
 
+    /// The same voice at an explicit size, for the one thing whose size isn't
+    /// ours to choose: the poem itself, which the reader sets in Settings.
+    static func serif(size: CGFloat, _ weight: Font.Weight = .regular) -> Font {
+        .system(size: size, design: .serif).weight(weight)
+    }
+
     /// The app's voice: labels, controls, metadata.
     static func label(_ style: Font.TextStyle = .caption2, _ weight: Font.Weight = .semibold) -> Font {
         .system(style, design: .default).weight(weight)
     }
 
-    /// The size verse is set at, which differs by how far the page is from
-    /// your eye.
-    static var verse: Font {
-        #if os(watchOS)
-        serif(.body)
-        #else
-        serif(.title3)
-        #endif
-    }
+    /// The text style verse follows for Dynamic Type, and the size it is set
+    /// at when the system's text size is the default one. Both differ by how
+    /// far the page is from your eye.
+    #if os(watchOS)
+    static let verseStyle = Font.TextStyle.body
+    static let verseSize: CGFloat = 16
+    #else
+    static let verseStyle = Font.TextStyle.title3
+    static let verseSize: CGFloat = 20
+    #endif
+
+    /// The size the line-number margin is set at, at that same default.
+    static let verseNumberSize: CGFloat = 11
 
     // MARK: - Metrics
 

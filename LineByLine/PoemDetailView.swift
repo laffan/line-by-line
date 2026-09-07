@@ -43,7 +43,8 @@ struct PoemDetailView: View {
                         Section {
                             PoemBody(poem: poem,
                                      session: session,
-                                     showLineNumbers: settings.settings.showLineNumbers)
+                                     showLineNumbers: settings.settings.showLineNumbers,
+                                     textScale: settings.settings.textScale)
                                 .padding(.top, 28)
                                 .padding(.bottom, 40)
                                 .padding(.horizontal, Theme.margin)

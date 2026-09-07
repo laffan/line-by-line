@@ -6,7 +6,10 @@ A small SwiftUI app for **iOS and watchOS** that helps you memorize poetry.
   its lines.
 - **The poem screen** — the poem set on paper-toned ground in a serif, stanza
   breaks preserved, turnovers gently indented, with an optional line-number
-  margin on the phone.
+  margin on the phone. Settings has a slider for how large the poem is set,
+  with a specimen of verse under it so you can see the size you're choosing.
+  Only the lines move with it — titles, authors, and the app's own lettering
+  keep their size.
 - **Practice, in place** — practice isn't a separate screen. Press *Practice* —
   the button at the foot of the page, or the icon in the top-right corner — and
   the poem blacks out where it sits; each tap (on the poem, or on *Next
@@ -25,7 +28,8 @@ A small SwiftUI app for **iOS and watchOS** that helps you memorize poetry.
   practises them the same way, on the same screen, from the same corner button.
   There the mode sits at the top of the page while you work, and a line you
   uncover holds still for two seconds before the page moves on. The wrist gets
-  no line-number margin.
+  no line-number margin, and sets verse at its own size — the text-size slider
+  is a phone setting.
 
 ## Project layout
 
@@ -74,6 +78,11 @@ paper ground, deep ink text, hairline rules, small tracked capitals for anything
 the app says, and a serif for the poem itself. No screen uses the system's
 grouped-list chrome or default control tinting, so the phone and watch read as
 the same printed object.
+
+Verse is the one thing whose size isn't the app's to fix: `PoemBody` sets it
+from the app's own size, scaled first by Dynamic Type and then by the reader's
+slider, and scales the line-number margin and the gaps between lines with it so
+the page keeps its proportions.
 
 ## Building
 

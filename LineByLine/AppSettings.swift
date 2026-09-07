@@ -52,12 +52,20 @@ struct LocationCue: Identifiable, Codable, Equatable, Hashable {
 struct AppSettings: Codable, Equatable {
     /// Number the lines of a poem in the margin.
     var showLineNumbers = false
+    /// How large a poem's lines are set, as a multiple of the size the app
+    /// sets verse at. Nothing else on the page moves with it.
+    var textScale = 1.0
     /// Master switch for the whole location-cue system.
     var locationCuesEnabled = false
     var cues: [LocationCue] = []
 
+    /// What the slider offers: a little smaller than the app's own size, up to
+    /// half again as large, in tenths.
+    static let textScaleRange = 0.8...1.8
+    static let textScaleStep = 0.1
+
     private enum CodingKeys: String, CodingKey {
-        case showLineNumbers, locationCuesEnabled, cues
+        case showLineNumbers, textScale, locationCuesEnabled, cues
     }
 
     init() {}
@@ -65,6 +73,11 @@ struct AppSettings: Codable, Equatable {
     init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         showLineNumbers = try container.decodeIfPresent(Bool.self, forKey: .showLineNumbers) ?? false
+        // Settings saved before the slider existed carry no size; anything
+        // outside the range the slider offers is pulled back into it.
+        let storedScale = try container.decodeIfPresent(Double.self, forKey: .textScale) ?? 1
+        textScale = min(max(storedScale, Self.textScaleRange.lowerBound),
+                        Self.textScaleRange.upperBound)
         locationCuesEnabled = try container.decodeIfPresent(Bool.self, forKey: .locationCuesEnabled) ?? false
         cues = try container.decodeIfPresent([LocationCue].self, forKey: .cues) ?? []
     }

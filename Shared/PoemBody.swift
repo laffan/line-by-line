@@ -10,21 +10,38 @@ struct PoemBody: View {
     /// `nil` while reading; a session while practising.
     let session: PracticeSession?
     let showLineNumbers: Bool
+    /// How large the reader has asked for the poem, as a multiple of the size
+    /// the app sets verse at. Only the verse moves with it: the app's own
+    /// voice — titles, authors, labels — keeps its size.
+    var textScale: Double = 1
+
+    /// Dynamic Type's say in the size, before the reader's. A font built from
+    /// an explicit point size doesn't scale itself, so the size is scaled
+    /// here and ``textScale`` multiplies what comes out.
+    @ScaledMetric(relativeTo: Theme.verseStyle) private var verseSize = Theme.verseSize
+    @ScaledMetric(relativeTo: .caption2) private var numberSize = Theme.verseNumberSize
 
     var body: some View {
-        VStack(alignment: .leading, spacing: Theme.lineGap) {
+        VStack(alignment: .leading, spacing: Theme.lineGap * scale) {
             ForEach(poem.lines) { line in
                 if line.isBreak {
-                    Color.clear.frame(height: Theme.lineGap)
+                    Color.clear.frame(height: Theme.lineGap * scale)
                 } else {
                     LineRow(line: line,
                             state: state(for: line),
-                            showLineNumbers: showLineNumbers)
+                            showLineNumbers: showLineNumbers,
+                            verseFont: Theme.serif(size: verseSize * scale),
+                            numberFont: Theme.serif(size: numberSize * scale).monospacedDigit(),
+                            gutter: Theme.gutter * scale)
                 }
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
     }
+
+    /// The reader's setting, held to a sane range: a stored value from another
+    /// version of the app shouldn't be able to break the page.
+    private var scale: CGFloat { CGFloat(min(max(textScale, 0.5), 2.5)) }
 
     private func state(for line: PoemLine) -> LineState {
         guard let session, let index = line.practiceIndex else { return .plain }
@@ -52,6 +69,11 @@ private struct LineRow: View {
     let line: PoemLine
     let state: LineState
     let showLineNumbers: Bool
+    /// The verse and the margin are set by ``PoemBody``, which is where the
+    /// reader's text size is known.
+    let verseFont: Font
+    let numberFont: Font
+    let gutter: CGFloat
 
     private var isCovered: Bool { state == .concealed || state == .next }
 
@@ -59,14 +81,14 @@ private struct LineRow: View {
         HStack(alignment: .firstTextBaseline, spacing: 0) {
             if showLineNumbers, let index = line.practiceIndex {
                 Text("\(index + 1)")
-                    .font(.system(.caption2, design: .serif).monospacedDigit())
+                    .font(numberFont)
                     .foregroundStyle(state == .next ? Theme.accent : Theme.inkFaint)
-                    .frame(width: Theme.gutter, alignment: .trailing)
+                    .frame(width: gutter, alignment: .trailing)
                     .padding(.trailing, 10)
             }
 
             VerseText(text: line.text)
-                .font(Theme.verse)
+                .font(verseFont)
                 .foregroundStyle(state == .context ? Theme.inkFaint : Theme.ink)
                 .opacity(isCovered ? 0 : 1)
                 .overlay {
